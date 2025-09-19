@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 import { 
   MapPin, 
   Clock, 
@@ -16,6 +17,7 @@ import {
 const Dashboard = () => {
   const { user } = useAuth();
   const [issues, setIssues] = useState([]);
+  const [stats, setStats] = useState([]);
   const [filter, setFilter] = useState('all');
 
   useEffect(() => {
@@ -58,6 +60,19 @@ const Dashboard = () => {
     setIssues(mockIssues);
   }, []);
 
+  useEffect(() => {
+    if (issues.length > 0) {
+      const newStats = [
+        { label: "Total Reports", value: issues.length, icon: <AlertTriangle className="h-6 w-6" />, color: "bg-blue-500" },
+        { label: "Resolved", value: issues.filter(i => i.status === 'resolved').length, icon: <CheckCircle className="h-6 w-6" />, color: "bg-green-500" },
+        { label: "In Progress", value: issues.filter(i => i.status === 'in-progress').length, icon: <Clock className="h-6 w-6" />, color: "bg-orange-500" },
+        // Assuming civic points come from the user object
+        { label: "Civic Points", value: user?.civicPoints || 150, icon: <Award className="h-6 w-6" />, color: "bg-purple-500" }
+      ];
+      setStats(newStats);
+    }
+  }, [issues, user]);
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'reported': return 'bg-blue-100 text-blue-800';
@@ -78,13 +93,6 @@ const Dashboard = () => {
   };
 
   const filteredIssues = filter === 'all' ? issues : issues.filter(issue => issue.status === filter);
-
-  const stats = [
-    { label: "Total Reports", value: issues.length, icon: <AlertTriangle className="h-6 w-6" />, color: "bg-blue-500" },
-    { label: "Resolved", value: issues.filter(i => i.status === 'resolved').length, icon: <CheckCircle className="h-6 w-6" />, color: "bg-green-500" },
-    { label: "In Progress", value: issues.filter(i => i.status === 'in-progress').length, icon: <Clock className="h-6 w-6" />, color: "bg-orange-500" },
-    { label: "Civic Points", value: 150, icon: <Award className="h-6 w-6" />, color: "bg-purple-500" }
-  ];
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -116,15 +124,15 @@ const Dashboard = () => {
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button className="bg-gradient-to-r from-blue-600 to-teal-600 text-white p-4 rounded-lg font-medium hover:from-blue-700 hover:to-teal-700 transition-all duration-200 transform hover:scale-105">
+            <Link to="/report" className="text-center bg-gradient-to-r from-blue-600 to-teal-600 text-white p-4 rounded-lg font-medium hover:from-blue-700 hover:to-teal-700 transition-all duration-200 transform hover:scale-105">
               Report New Issue
-            </button>
-            <button className="bg-gradient-to-r from-orange-500 to-red-500 text-white p-4 rounded-lg font-medium hover:from-orange-600 hover:to-red-600 transition-all duration-200 transform hover:scale-105">
+            </Link>
+            <Link to="/report?emergency=true" className="text-center bg-gradient-to-r from-orange-500 to-red-500 text-white p-4 rounded-lg font-medium hover:from-orange-600 hover:to-red-600 transition-all duration-200 transform hover:scale-105">
               Emergency Report
-            </button>
-            <button className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-4 rounded-lg font-medium hover:from-purple-600 hover:to-pink-600 transition-all duration-200 transform hover:scale-105">
+            </Link>
+            <Link to="/forum" className="text-center bg-gradient-to-r from-purple-500 to-pink-500 text-white p-4 rounded-lg font-medium hover:from-purple-600 hover:to-pink-600 transition-all duration-200 transform hover:scale-105">
               Community Forum
-            </button>
+            </Link>
           </div>
         </div>
 

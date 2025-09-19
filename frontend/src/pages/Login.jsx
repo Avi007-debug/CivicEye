@@ -56,16 +56,17 @@ const Login = () => {
     }
     
     try {
-      await login(formData.email, formData.password, formData.role);
+      const { user } = await login(formData.email, formData.password, formData.role);
       
       // Redirect based on role
-      if (formData.role === 'government') {
+      if (user.role === 'government') {
         navigate('/gov-dashboard');
       } else {
         navigate('/dashboard');
       }
     } catch (error) {
-      setErrors({ general: 'Login failed. Please check your credentials.' });
+      // Display specific error message from the API
+      setErrors({ general: error.message || 'Login failed. Please check your credentials.' });
     }
   };
 
@@ -196,9 +197,9 @@ const Login = () => {
             </div>
 
             <div className="text-sm">
-              <a href="#" className="font-medium text-blue-600 hover:text-blue-500">
+              <Link to="/forgot-password" className="font-medium text-blue-600 hover:text-blue-500">
                 Forgot password?
-              </a>
+              </Link>
             </div>
           </div>
 
@@ -235,13 +236,15 @@ const Login = () => {
         </form>
 
         {/* Demo credentials */}
-        <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">Demo Credentials:</h3>
-          <div className="text-xs text-gray-600 space-y-1">
-            <p><strong>Citizen:</strong> citizen@demo.com / password123</p>
-            <p><strong>Government:</strong> gov@demo.com / password123</p>
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-8 p-4 bg-gray-50 rounded-lg">
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Demo Credentials:</h3>
+            <div className="text-xs text-gray-600 space-y-1">
+              <p><strong>Citizen:</strong> citizen@demo.com / password123</p>
+              <p><strong>Government:</strong> gov@demo.com / password123</p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
