@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-const Login = () => {
+const LoginReal = () => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -11,7 +11,7 @@ const Login = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
-  
+
   const { login, isLoading } = useAuth();
   const navigate = useNavigate();
 
@@ -31,19 +31,19 @@ const Login = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    
+
     if (!formData.email) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Email is invalid';
     }
-    
+
     if (!formData.password) {
       newErrors.password = 'Password is required';
     } else if (formData.password.length < 6) {
       newErrors.password = 'Password must be at least 6 characters';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -52,26 +52,42 @@ const Login = () => {
     e.preventDefault();
 
     if (!validateForm()) {
-        return;
+      return;
     }
 
     try {
-      // The login function from AuthContext will handle the API call
-      const loggedInUser = await login(
-        formData.email,
-        formData.password,
-        formData.role
-      );
+      // Call backend API instead of direct Supabase Auth
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password
+        })
+      });
 
-      // Redirect based on the role received from the backend/context
-      if (loggedInUser.user_type === 'government') {
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Login failed');
+      }
+
+      // Store tokens in localStorage
+      localStorage.setItem('access_token', result.access_token);
+      localStorage.setItem('refresh_token', result.refresh_token);
+
+      // Redirect based on role
+      if (result.user.user_type === 'government') {
         navigate('/gov-dashboard');
       } else {
         navigate('/dashboard');
       }
     } catch (error) {
-      // Display the specific error message from the API call
-      setErrors({ general: error.message || 'Login failed. Please check your credentials.' });
+      console.error('Login error:', error);
+      // Display specific error message from the API
+      setErrors({
+        general: error.message || 'Login failed. Please check your credentials and try again.'
+      });
     }
   };
 
@@ -83,7 +99,7 @@ const Login = () => {
           <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-teal-600 rounded-xl flex items-center justify-center mx-auto mb-4">
             <span className="text-white font-bold text-2xl">🏛️</span>
           </div>
-          <h2 className="text-3xl font-bold text-gray-900">Sign in to CivicConnect</h2>
+          <h2 className="text-3xl font-bold text-gray-900">Sign in to CivicEye</h2>
           <p className="mt-2 text-gray-600">
             Welcome back! Please sign in to your account.
           </p>
@@ -240,19 +256,18 @@ const Login = () => {
           </div>
         </form>
 
-        {/* Demo credentials */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Demo Credentials:</h3>
-            <div className="text-xs text-gray-600 space-y-1">
-              <p><strong>Citizen:</strong> citizen@demo.com / password123</p>
-              <p><strong>Government:</strong> gov@demo.com / password123</p>
-            </div>
+        {/* Environment info */}
+        <div className="mt-8 p-4 bg-blue-50 rounded-lg">
+          <h3 className="text-sm font-medium text-blue-700 mb-2">🔧 Development Mode</h3>
+          <div className="text-xs text-blue-600 space-y-1">
+            <p><strong>Backend:</strong> http://localhost:5000</p>
+            <p><strong>Frontend:</strong> http://localhost:5173</p>
+            <p><strong>Status:</strong> Backend is running ✅</p>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
 };
 
-export default Login;
+export default LoginReal;
