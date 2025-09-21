@@ -86,40 +86,29 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-    
-  try {
-   // Call backend API instead of direct Supabase Auth
-    const response = await fetch('http://localhost:5000/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: formData.email,
-        password: formData.password,
-        full_name: formData.name,
-        user_type: formData.role
-      })
-    });
 
-    const result = await response.json();
+    if (!validateForm()) return;
 
-    if (!response.ok) {
-      throw new Error(result.message || 'Registration failed');
-    }
+    try {
+      // Use AuthContext.register
+      const { user } = await register(
+        formData.name,        // full name
+        formData.email,
+        formData.password,
+        formData.role,
+        formData.phone,
+        formData.address
+      );
 
-    // Redirect based on role
-    if (formData.role === 'government') {
-      navigate('/gov-dashboard');
-    } else {
-      navigate('/dashboard');
+      // Redirect based on role
+      if (user.role === 'government') {
+        navigate('/gov-dashboard');
+      } else {
+        navigate('/dashboard');
+      }
+    } catch (error) {
+      setErrors({ general: error.message || 'Registration failed. Please try again.' });
     }
-  } catch (error) {
-    setErrors({ general: error.message || 'Registration failed. Please try again.' });
-  }
-  
   };
 
   return (

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
+
 const Login = () => {
   const [formData, setFormData] = useState({
     email: '',
@@ -65,9 +66,9 @@ const Login = () => {
 
       // Redirect based on the role received from the backend/context
       if (loggedInUser.user_type === 'government') {
-        navigate('/gov-dashboard');
+        navigate('/gov-dashboard', { replace: true });
       } else {
-        navigate('/dashboard');
+        navigate('/dashboard', { replace: true });
       }
     } catch (error) {
       // Display the specific error message from the API call
@@ -245,8 +246,8 @@ const Login = () => {
           <div className="mt-8 p-4 bg-gray-50 rounded-lg">
             <h3 className="text-sm font-medium text-gray-700 mb-2">Demo Credentials:</h3>
             <div className="text-xs text-gray-600 space-y-1">
-              <p><strong>Citizen:</strong> citizen@demo.com / password123</p>
-              <p><strong>Government:</strong> gov@demo.com / password123</p>
+              <p><strong>Citizen:</strong> test1@gmail.com / Test@123456</p>
+              <p><strong>Government:</strong> gov@gmail.com / Test@12345</p>
             </div>
           </div>
         )}

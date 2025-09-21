@@ -117,7 +117,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (fullName, email, password, userType = 'citizen') => {
+  const register = async (fullName, email, password, userType = 'citizen', phone = '', address = '') => {
     setIsLoading(true);
     try {
       // Call backend API instead of direct Supabase Auth
@@ -128,7 +128,9 @@ export const AuthProvider = ({ children }) => {
           email: email,
           password: password,
           full_name: fullName,
-          user_type: userType
+          user_type: userType,
+          phone: phone,
+          address: address
         })
       });
 
@@ -137,6 +139,10 @@ export const AuthProvider = ({ children }) => {
       if (!response.ok) {
         throw new Error(result.message || 'Registration failed');
       }
+
+      // Save tokens
+      localStorage.setItem('access_token', result.access_token);
+      localStorage.setItem('refresh_token', result.refresh_token);
 
       // Set user state
       setUser({
