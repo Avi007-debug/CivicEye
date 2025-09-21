@@ -49,7 +49,7 @@ const Help = () => {
     },
     {
       question: "Can I report issues in my local language?",
-      answer: "Yes, CivicConnect supports multiple languages including Hindi, Tamil, Telugu, Bengali, and Gujarati. Select your preferred language at the beginning of the reporting process."
+      answer: "Yes, CivicEye supports multiple languages including Hindi, Tamil, Telugu, Bengali, and Gujarati. Select your preferred language at the beginning of the reporting process."
     },
     {
       question: "What if my issue is not resolved within the estimated time?",
@@ -57,13 +57,13 @@ const Help = () => {
     },
     {
       question: "How can I contact support?",
-      answer: "You can contact our support team via email at support@civicconnect.gov.in, call our helpline at 1800-123-4567, or use the live chat feature available 24/7 on our website."
+      answer: "You can contact our support team via email at support@CivicEye.gov.in, call our helpline at 1800-123-4567, or use the live chat feature available 24/7 on our website."
     }
   ];
 
   const guides = [
     {
-      title: "Getting Started with CivicConnect",
+      title: "Getting Started with CivicEye",
       description: "A comprehensive guide to help you get started with reporting and tracking civic issues.",
       icon: <BookOpen className="h-8 w-8" />,
       color: "bg-blue-500"
@@ -99,7 +99,7 @@ const Help = () => {
     {
       title: "Email Support",
       description: "Send us an email",
-      contact: "support@civicconnect.gov.in",
+      contact: "support@CivicEye.gov.in",
       icon: <Mail className="h-6 w-6" />,
       color: "bg-blue-500"
     },
@@ -286,14 +286,14 @@ const Help = () => {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Help & Support</h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Find answers to your questions and get help with using CivicConnect
+            Find answers to your questions and get help with using CivicEye
           </p>
         </div>
 
         {/* Tabs */}
         <div className="border-b border-gray-200 mb-8">
           <nav className="flex space-x-8" aria-label="Tabs">
-            {[
+            {[ 
               { id: 'faq', name: 'Frequently Asked Questions', icon: <HelpCircle className="h-5 w-5" /> },
               { id: 'guides', name: 'Guides & Tutorials', icon: <BookOpen className="h-5 w-5" /> },
               { id: 'contact', name: 'Contact Support', icon: <MessageCircle className="h-5 w-5" /> }

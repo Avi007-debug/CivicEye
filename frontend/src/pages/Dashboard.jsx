@@ -15,63 +15,60 @@ import {
 } from 'lucide-react';
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
+  // --- FIX: Get token directly from the session object for consistency ---
+  const token = session?.access_token;
   const [issues, setIssues] = useState([]);
   const [stats, setStats] = useState([]);
   const [filter, setFilter] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Mock data for user's reported issues
-    const mockIssues = [
-      {
-        id: 1,
-        title: "Pothole on Main Street",
-        status: "in-progress",
-        priority: "high",
-        location: "Main Street, Downtown",
-        date: "2024-01-15",
-        upvotes: 23,
-        comments: 5,
-        category: "Roads"
-      },
-      {
-        id: 2,
-        title: "Broken Street Light",
-        status: "resolved",
-        priority: "medium",
-        location: "Park Avenue",
-        date: "2024-01-10",
-        upvotes: 12,
-        comments: 3,
-        category: "Lighting"
-      },
-      {
-        id: 3,
-        title: "Garbage Collection Delay",
-        status: "reported",
-        priority: "low",
-        location: "Residential Area",
-        date: "2024-01-18",
-        upvotes: 8,
-        comments: 2,
-        category: "Sanitation"
+    const fetchDashboardData = async () => {
+      // Ensure we don't fetch if the token is missing
+      if (!token) {
+        setLoading(false);
+        setError("You must be logged in to view the dashboard.");
+        return;
       }
-    ];
-    setIssues(mockIssues);
-  }, []);
+      
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch('http://localhost:5000/api/dashboard/citizen', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || `Error fetching dashboard data`);
+        }
+        const data = await response.json();
 
-  useEffect(() => {
-    if (issues.length > 0) {
-      const newStats = [
-        { label: "Total Reports", value: issues.length, icon: <AlertTriangle className="h-6 w-6" />, color: "bg-blue-500" },
-        { label: "Resolved", value: issues.filter(i => i.status === 'resolved').length, icon: <CheckCircle className="h-6 w-6" />, color: "bg-green-500" },
-        { label: "In Progress", value: issues.filter(i => i.status === 'in-progress').length, icon: <Clock className="h-6 w-6" />, color: "bg-orange-500" },
-        // Assuming civic points come from the user object
-        { label: "Civic Points", value: user?.civicPoints || 150, icon: <Award className="h-6 w-6" />, color: "bg-purple-500" }
-      ];
-      setStats(newStats);
-    }
-  }, [issues, user]);
+        // Map backend statistics to frontend stats cards
+        const newStats = [
+          { label: "Total Reports", value: data.statistics.total_issues, icon: <AlertTriangle className="h-6 w-6" />, color: "bg-blue-500" },
+          { label: "Resolved", value: data.statistics.resolved_issues, icon: <CheckCircle className="h-6 w-6" />, color: "bg-green-500" },
+          { label: "In Progress", value: data.statistics.in_progress_issues, icon: <Clock className="h-6 w-6" />, color: "bg-orange-500" },
+          // Assuming civic points are stored on the user object from AuthContext
+          { label: "Civic Points", value: user?.civic_points || 0, icon: <Award className="h-6 w-6" />, color: "bg-purple-500" }
+        ];
+        setStats(newStats);
+
+        // Use recent issues from backend
+        setIssues(data.recent_issues);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+    
+  }, [token, user?.civic_points]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -93,6 +90,25 @@ const Dashboard = () => {
   };
 
   const filteredIssues = filter === 'all' ? issues : issues.filter(issue => issue.status === filter);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center p-6 bg-white rounded-lg shadow-md">
+          <p className="text-red-600 text-lg mb-4">Error: {error}</p>
+          <Link to="/login" className="text-blue-600 hover:underline font-semibold">Go to Login Page</Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -140,7 +156,7 @@ const Dashboard = () => {
         <div className="bg-white rounded-lg shadow-md">
           <div className="p-6 border-b border-gray-200">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 sm:mb-0">Your Reported Issues</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4 sm:mb-0">Your Recent Issues</h2>
               <div className="flex items-center space-x-4">
                 <Filter className="h-5 w-5 text-gray-400" />
                 <select
@@ -150,7 +166,6 @@ const Dashboard = () => {
                 >
                   <option value="all">All Issues</option>
                   <option value="reported">Reported</option>
-                  <option value="verified">Verified</option>
                   <option value="in-progress">In Progress</option>
                   <option value="resolved">Resolved</option>
                 </select>
@@ -159,7 +174,7 @@ const Dashboard = () => {
           </div>
           
           <div className="divide-y divide-gray-200">
-            {filteredIssues.map((issue) => (
+            {filteredIssues.length > 0 ? filteredIssues.map((issue) => (
               <div key={issue.id} className="p-6 hover:bg-gray-50 transition-colors duration-150">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between">
                   <div className="flex-1">
@@ -175,11 +190,12 @@ const Dashboard = () => {
                     <div className="flex items-center text-sm text-gray-500 space-x-4 mb-2">
                       <div className="flex items-center">
                         <MapPin className="h-4 w-4 mr-1" />
-                        {issue.location}
+                        {issue.location_address || 'No location specified'}
                       </div>
                       <div className="flex items-center">
                         <Calendar className="h-4 w-4 mr-1" />
-                        {new Date(issue.date).toLocaleDateString()}
+                        {/* --- FIX: Use 'created_at' from backend instead of 'date' --- */}
+                        {new Date(issue.created_at).toLocaleDateString()}
                       </div>
                       <div className="flex items-center">
                         <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">{issue.category}</span>
@@ -189,11 +205,11 @@ const Dashboard = () => {
                   <div className="flex items-center space-x-6 mt-4 lg:mt-0">
                     <div className="flex items-center text-sm text-gray-500">
                       <ThumbsUp className="h-4 w-4 mr-1" />
-                      {issue.upvotes}
+                      {issue.upvotes || 0}
                     </div>
                     <div className="flex items-center text-sm text-gray-500">
                       <MessageSquare className="h-4 w-4 mr-1" />
-                      {issue.comments}
+                      {issue.comments || 0}
                     </div>
                     <button className="text-blue-600 hover:text-blue-800 font-medium text-sm">
                       View Details
@@ -201,7 +217,11 @@ const Dashboard = () => {
                   </div>
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="p-6 text-center text-gray-500">
+                You haven't reported any issues yet.
+              </div>
+            )}
           </div>
         </div>
 
@@ -211,12 +231,12 @@ const Dashboard = () => {
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-purple-100">Current Level: Community Champion</p>
-              <p className="text-sm text-purple-200">150 / 200 points to next level</p>
+              <p className="text-sm text-purple-200">{user?.civic_points || 0} / 200 points to next level</p>
             </div>
             <Award className="h-12 w-12 text-yellow-300" />
           </div>
           <div className="w-full bg-purple-400 rounded-full h-2">
-            <div className="bg-yellow-300 h-2 rounded-full" style={{ width: '75%' }}></div>
+            <div className="bg-yellow-300 h-2 rounded-full" style={{ width: `${((user?.civic_points || 0)/200)*100}%` }}></div>
           </div>
         </div>
       </div>

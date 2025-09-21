@@ -461,7 +461,7 @@ const ReportIssue = () => {
               </div>
               <div>
                 <h4 className="font-semibold mb-1">Telegram Bot</h4>
-                <p className="text-sm text-blue-100">Search @CivicConnectBot</p>
+                <p className="text-sm text-blue-100">Search @CivicEyeBot</p>
               </div>
             </div>
           </div>

@@ -54,16 +54,16 @@ export const AuthProvider = ({ children }) => {
               access_token: accessToken,
               refresh_token: localStorage.getItem('refresh_token')
             });
+          } else if (profileResponse.status === 404) {
+            // Profile not found, likely user not logged in yet, silently ignore
           } else {
-            // Token is invalid, clear localStorage
+            // Token is invalid or other error, clear localStorage
             localStorage.removeItem('access_token');
             localStorage.removeItem('refresh_token');
           }
         } catch (error) {
+          // Log unexpected errors but do not clear tokens to avoid disrupting other functions
           console.error('Error initializing auth:', error);
-          // Token is invalid, clear localStorage
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
         }
       }
 
@@ -107,6 +107,12 @@ export const AuthProvider = ({ children }) => {
         name: result.user.full_name,
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(result.user.full_name)}&background=3B82F6&color=fff&size=128`,
         role: result.user.user_type
+      });
+
+      // Set session state with tokens
+      setSession({
+        access_token: result.access_token,
+        refresh_token: result.refresh_token
       });
 
       setIsLoading(false);

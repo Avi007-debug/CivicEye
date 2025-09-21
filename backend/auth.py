@@ -2,7 +2,6 @@ from flask import Blueprint, request, jsonify
 from supabase import Client
 from functools import wraps
 from datetime import datetime
-import jwt
 
 auth_bp = Blueprint('auth', __name__)
 supabase: Client = None
@@ -15,20 +14,26 @@ def init_auth(supabase_client: Client):
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        token = request.headers.get('Authorization')
+        if request.method == 'OPTIONS':
+            return f(*args, **kwargs)
+
+        token = None
+        if 'Authorization' in request.headers and request.headers['Authorization'].startswith('Bearer '):
+            token = request.headers['Authorization'].split(' ')[1]
+        
         if not token:
-            return jsonify({'message': 'Token is missing'}), 401
+            return jsonify({'message': 'Token is missing!'}), 401
 
         try:
-            if token.startswith('Bearer '):
-                token = token.split(' ')[1]
-
-            # Decode JWT without verifying signature (development only)
-            payload = jwt.decode(token, options={"verify_signature": False})
-            request.user_id = payload.get('sub')
+            user_response = supabase.auth.get_user(token)
+            user = user_response.user
+            if not user:
+                return jsonify({'message': 'User not found for this token'}), 401
+            
+            # Attach user_id to the request for endpoint functions to use
+            request.user_id = user.id
             if not request.user_id:
-                return jsonify({'message': 'Token missing sub field'}), 401
-
+                return jsonify({'message': 'Token is valid but user ID is missing'}), 401
         except Exception as e:
             return jsonify({'message': 'Token is invalid', 'error': str(e)}), 401
 
@@ -36,14 +41,11 @@ def token_required(f):
     return decorated
 
 # ----------------- Register -----------------
-
-# ----------------- Register -----------------
 @auth_bp.route('/register', methods=['POST'])
 def register():
-    """Register a new user and create profile"""
+    """Register a new user, create a profile, and return a session."""
     try:
         data = request.get_json()
-
         email = data.get('email')
         password = data.get('password')
         full_name = data.get('full_name', '')
@@ -52,7 +54,6 @@ def register():
         if not email or not password:
             return jsonify({'message': 'Email and password are required'}), 400
 
-        # Corrected sign_up call using dictionary
         auth_response = supabase.auth.sign_up({
             'email': email,
             'password': password,
@@ -64,31 +65,31 @@ def register():
             }
         })
 
-        if auth_response.user:
-            # Create profile in 'profiles' table
+        # --- FIX: Check for both user and session objects ---
+        if auth_response.user and auth_response.session:
             profile_data = {
                 'id': auth_response.user.id,
                 'email': email,
                 'full_name': full_name,
                 'user_type': user_type,
-                'created_at': datetime.utcnow().isoformat()
             }
-
             supabase.table('profiles').insert(profile_data).execute()
 
+            # --- FIX: Return session tokens for automatic login on the frontend ---
             return jsonify({
                 'message': 'User registered successfully',
-                'user': profile_data
+                'user': profile_data,
+                'access_token': auth_response.session.access_token,
+                'refresh_token': auth_response.session.refresh_token
             }), 201
         else:
-            return jsonify({
-                'message': 'Registration failed',
-                'error': getattr(auth_response, 'message', str(auth_response))
-            }), 400
+            error_message = getattr(auth_response, 'message', str(auth_response))
+            # Handle cases where user might already exist
+            if "User already registered" in str(error_message):
+                 return jsonify({'message': 'An account with this email already exists.'}), 409
+            return jsonify({'message': 'Registration failed', 'error': error_message}), 400
 
     except Exception as e:
-        # It's good practice to log the error to a file or logging service in production
-        # For example: current_app.logger.error(f"Registration error: {e}")
         return jsonify({'message': 'Registration failed', 'error': str(e)}), 500
 
 # ----------------- Login -----------------
@@ -126,7 +127,8 @@ def login():
 # ----------------- Logout -----------------
 @auth_bp.route('/logout', methods=['POST'])
 def logout():
-    # Supabase handles logout client-side
+    # Supabase handles logout client-side by clearing tokens.
+    # This endpoint is mostly for completeness.
     return jsonify({'message': 'Logout successful'}), 200
 
 # ----------------- Get Profile -----------------
@@ -157,8 +159,9 @@ def update_profile():
         update_data = {}
         if 'full_name' in data:
             update_data['full_name'] = data['full_name']
-        if 'user_type' in data:
-            update_data['user_type'] = data['user_type']
+        
+        # Note: Do not allow changing user_type via a simple profile update for security.
+        # This should be a separate, admin-only process.
 
         if update_data:
             supabase.table('profiles').update(update_data).eq('id', user_id).execute()

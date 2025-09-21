@@ -34,7 +34,7 @@ const Navbar = () => {
               <span className="text-white font-bold text-lg">🏛️</span>
             </div>
             <span className="text-xl font-bold text-gray-800 group-hover:text-blue-600 transition-colors duration-200">
-              CivicConnect
+              CivicEye
             </span>
           </Link>
 
