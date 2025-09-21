@@ -8,6 +8,9 @@ import TrackIssue from './pages/TrackIssue';
 import Help from './pages/Help';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Profile from './pages/Profile';
+import Settings from './pages/Settings';
+import ForgotPassword from './pages/ForgotPassword';
 import GovDashboard from './pages/GovDashboard';
 import { AuthProvider } from './context/AuthContext';
 
@@ -45,6 +48,9 @@ function App() {
             <Route path="/help" element={<Help />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
           </Routes>
         </div>
       </Router>
