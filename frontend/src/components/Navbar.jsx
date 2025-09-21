@@ -19,7 +19,7 @@ const Navbar = () => {
   const navLinks = [
     { name: 'Home', href: '/' },
     { name: 'Dashboard', href: user?.role === 'government' ? '/gov-dashboard' : '/dashboard' },
-    { name: 'Report Issue', href: '/report' },
+    { name: 'Report Issue', href: user ? '/report' : (user?.role === 'government' ? '/gov-dashboard' : '/dashboard') },
     { name: 'Track Issue', href: '/track' },
     { name: 'Help', href: '/help' },
   ];
