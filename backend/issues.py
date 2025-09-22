@@ -1,6 +1,5 @@
 from flask import Blueprint, request, jsonify
 from supabase import Client
-import uuid
 from datetime import datetime
 from auth import token_required
 
@@ -11,45 +10,52 @@ def init_issues(supabase_client):
     global supabase
     supabase = supabase_client
 
-@issues_bp.route('/issues', methods=['POST'])
+# --- CHANGE: Route updated to '/' since '/api/issues' is the blueprint prefix ---
+@issues_bp.route('/', methods=['POST'])
 @token_required
 def report_issue():
     """Report a new issue"""
     try:
-        token = request.headers.get('Authorization')
-        if token.startswith('Bearer '):
-            token = token.split(' ')[1]
-
-        user = supabase.auth.get_user(token)
+        # --- CHANGE: Use user_id and token from the decorator and headers ---
+        user_id = request.user_id
+        token = request.headers.get('Authorization').split(" ")[1]
         data = request.get_json()
 
-        if not user or not data:
-            return jsonify({'message': 'Invalid request'}), 400
+        if not data:
+            return jsonify({'message': 'Invalid request body'}), 400
 
-        # Validate required fields
-        required_fields = ['title', 'description', 'category', 'location']
+        # --- CHANGE: Updated validation for 'location_text' and cleaned data ---
+        required_fields = ['title', 'description', 'category', 'location_text']
         for field in required_fields:
             if field not in data or not data[field]:
                 return jsonify({'message': f'{field} is required'}), 400
 
         issue_data = {
-            'id': str(uuid.uuid4()),
-            'user_id': user.user.id,
-            'title': data['title'],
-            'description': data['description'],
-            'category': data['category'],
-            'location': data['location'],
-            'priority': data.get('priority', 'medium'),
-            'status': 'reported',
-            'image_url': data.get('image_url', ''),
-            'latitude': data.get('latitude'),
-            'longitude': data.get('longitude'),
-            'created_at': datetime.utcnow().isoformat(),
-            'updated_at': datetime.utcnow().isoformat()
+            'user_id': user_id,
+            'title': data['title'].strip(),
+            'description': data['description'].strip(),
+            'category': data['category'].strip().lower(),
+            'location_text': data['location_text'].strip(),
+            'priority': data.get('priority', 'medium').strip().lower(),
+            'status': 'reported',  # Set initial status consistently
+            'image_url': data.get('image_url', []), # Default to empty array
+            'is_anonymous': data.get('is_anonymous', False),
+            'language': data.get('language', 'english'),
+            # --- REMOVED: Let the database handle id, created_at, and updated_at ---
         }
 
-        # Insert issue into database
-        result = supabase.table('issues').insert(issue_data).execute()
+        # --- CHANGE: Switch to user's token to enforce RLS INSERT policies ---
+        original_auth = supabase.postgrest.auth
+        try:
+            supabase.postgrest.auth(token)
+            # Insert issue into database
+            result = supabase.table('issues').insert(issue_data).execute()
+        finally:
+            # Restore the service role key for other operations
+            supabase.postgrest.auth(original_auth)
+
+        if not result.data:
+            raise Exception("Failed to insert issue. Check RLS policies.")
 
         return jsonify({
             'message': 'Issue reported successfully',
@@ -57,134 +63,116 @@ def report_issue():
         }), 201
 
     except Exception as e:
+        print(f"ERROR in report_issue: {e}")
         return jsonify({'message': 'Failed to report issue', 'error': str(e)}), 500
 
-@issues_bp.route('/issues', methods=['GET'])
+
+# --- CHANGE: Route updated to '/' ---
+@issues_bp.route('/', methods=['GET'])
 @token_required
 def get_issues():
-    """Get all issues for the logged-in user"""
+    """Get issues based on user role (citizen vs government)"""
     try:
-        token = request.headers.get('Authorization')
-        if token.startswith('Bearer '):
-            token = token.split(' ')[1]
+        user_id = request.user_id
+        token = request.headers.get('Authorization').split(" ")[1]
 
-        user = supabase.auth.get_user(token)
-
-        if not user:
-            return jsonify({'message': 'User not found'}), 404
-
-        # Get user profile to check user type
-        profile_response = supabase.table('profiles').select('user_type').eq('id', user.user.id).execute()
-
-        if not profile_response.data:
-            return jsonify({'message': 'User profile not found'}), 404
-
-        user_type = profile_response.data[0]['user_type']
-
-        # If government user, get all issues; if citizen, get only their issues
-        if user_type == 'government':
+        # --- CHANGE: Switch to user's token to enforce RLS for all queries ---
+        # This is more secure than python-based logic, as it relies on database security.
+        original_auth = supabase.postgrest.auth
+        try:
+            supabase.postgrest.auth(token)
+            
+            # RLS will now automatically filter for the user.
+            # A government user's policy can allow SELECT *, while a citizen's is `user_id = auth.uid()`
             query = supabase.table('issues').select('*').order('created_at', desc=True)
-        else:
-            query = supabase.table('issues').select('*').eq('user_id', user.user.id).order('created_at', desc=True)
 
-        # Apply filters if provided
-        category = request.args.get('category')
-        status = request.args.get('status')
-        priority = request.args.get('priority')
+            # Apply filters if provided
+            if request.args.get('category'):
+                query = query.eq('category', request.args.get('category'))
+            if request.args.get('status'):
+                query = query.eq('status', request.args.get('status'))
+            if request.args.get('priority'):
+                query = query.eq('priority', request.args.get('priority'))
 
-        if category:
-            query = query.eq('category', category)
-        if status:
-            query = query.eq('status', status)
-        if priority:
-            query = query.eq('priority', priority)
+            result = query.execute()
 
-        result = query.execute()
-
+        finally:
+            supabase.postgrest.auth(original_auth)
+        
         return jsonify({
             'issues': result.data,
             'total': len(result.data)
         }), 200
 
     except Exception as e:
+        print(f"ERROR in get_issues: {e}")
         return jsonify({'message': 'Failed to get issues', 'error': str(e)}), 500
 
-@issues_bp.route('/issues/<issue_id>', methods=['GET'])
+
+@issues_bp.route('/<int:issue_id>', methods=['GET'])
 @token_required
 def get_issue(issue_id):
     """Get a specific issue by ID"""
     try:
-        token = request.headers.get('Authorization')
-        if token.startswith('Bearer '):
-            token = token.split(' ')[1]
+        user_id = request.user_id
+        token = request.headers.get('Authorization').split(" ")[1]
 
-        user = supabase.auth.get_user(token)
-
-        if not user:
-            return jsonify({'message': 'User not found'}), 404
-
-        # Get issue with user profile information
-        result = supabase.table('issues').select('*, profiles(full_name, email)').eq('id', issue_id).execute()
+        # --- CHANGE: Switch to user's token to enforce RLS for security ---
+        original_auth = supabase.postgrest.auth
+        try:
+            supabase.postgrest.auth(token)
+            # This query will only return data if the user is allowed to see it by RLS.
+            result = supabase.table('issues').select('*, profiles(full_name, email)').eq('id', issue_id).single().execute()
+        finally:
+            supabase.postgrest.auth(original_auth)
 
         if not result.data:
-            return jsonify({'message': 'Issue not found'}), 404
+            return jsonify({'message': 'Issue not found or access denied'}), 404
 
-        issue = result.data[0]
-
-        # Check if user can access this issue (own issue or government user)
-        profile_response = supabase.table('profiles').select('user_type').eq('id', user.user.id).execute()
-
-        if profile_response.data[0]['user_type'] != 'government' and issue['user_id'] != user.user.id:
-            return jsonify({'message': 'Access denied'}), 403
-
-        return jsonify({'issue': issue}), 200
+        return jsonify({'issue': result.data}), 200
 
     except Exception as e:
+        print(f"ERROR in get_issue: {e}")
         return jsonify({'message': 'Failed to get issue', 'error': str(e)}), 500
 
-@issues_bp.route('/issues/<issue_id>', methods=['PUT'])
+
+@issues_bp.route('/<int:issue_id>', methods=['PUT'])
 @token_required
 def update_issue(issue_id):
-    """Update an issue (status, priority, etc.)"""
+    """Update an issue (status, priority, etc.) - FOR GOVERNMENT ONLY"""
     try:
-        token = request.headers.get('Authorization')
-        if token.startswith('Bearer '):
-            token = token.split(' ')[1]
+        user_id = request.user_id
+        
+        # --- CHANGE: Use service key for admin checks and actions ---
+        # 1. Verify user is a government official
+        profile_response = supabase.table('profiles').select('user_type').eq('id', user_id).single().execute()
 
-        user = supabase.auth.get_user(token)
-
-        if not user:
-            return jsonify({'message': 'User not found'}), 404
-
-        # Check if user is government official
-        profile_response = supabase.table('profiles').select('user_type').eq('id', user.user.id).execute()
-
-        if not profile_response.data or profile_response.data[0]['user_type'] != 'government':
-            return jsonify({'message': 'Only government officials can update issues'}), 403
+        if not profile_response.data or profile_response.data.get('user_type') != 'government':
+            return jsonify({'message': 'Access denied. Only government officials can update issues.'}), 403
 
         data = request.get_json()
-
         if not data:
             return jsonify({'message': 'No data provided'}), 400
 
-        # Get current issue
-        current_issue = supabase.table('issues').select('*').eq('id', issue_id).execute()
-
-        if not current_issue.data:
-            return jsonify({'message': 'Issue not found'}), 404
-
-        # Prepare update data
         update_data = {
             'updated_at': datetime.utcnow().isoformat()
         }
 
+        # --- CHANGE: Clean any incoming data before updating ---
         allowed_fields = ['status', 'priority', 'assigned_to', 'notes']
         for field in allowed_fields:
             if field in data:
-                update_data[field] = data[field]
+                # Clean the data before adding it to the update payload
+                update_data[field] = data[field].strip() if isinstance(data[field], str) else data[field]
 
-        # Update issue
+        if len(update_data) == 1: # Only updated_at is present
+             return jsonify({'message': 'No valid fields to update'}), 400
+
+        # 2. Perform the update using the service key's privileges
         result = supabase.table('issues').update(update_data).eq('id', issue_id).execute()
+
+        if not result.data:
+            return jsonify({'message': 'Issue not found'}), 404
 
         return jsonify({
             'message': 'Issue updated successfully',
@@ -192,33 +180,39 @@ def update_issue(issue_id):
         }), 200
 
     except Exception as e:
+        print(f"ERROR in update_issue: {e}")
         return jsonify({'message': 'Failed to update issue', 'error': str(e)}), 500
 
-@issues_bp.route('/issues/<issue_id>/comments', methods=['POST'])
+
+@issues_bp.route('/<int:issue_id>/comments', methods=['POST'])
 @token_required
 def add_comment(issue_id):
     """Add a comment to an issue"""
     try:
-        token = request.headers.get('Authorization')
-        if token.startswith('Bearer '):
-            token = token.split(' ')[1]
-
-        user = supabase.auth.get_user(token)
+        user_id = request.user_id
+        token = request.headers.get('Authorization').split(" ")[1]
         data = request.get_json()
 
-        if not user or not data or not data.get('comment'):
-            return jsonify({'message': 'Comment is required'}), 400
+        if not data or not data.get('comment'):
+            return jsonify({'message': 'Comment text is required'}), 400
 
         comment_data = {
-            'id': str(uuid.uuid4()),
             'issue_id': issue_id,
-            'user_id': user.user.id,
-            'comment': data['comment'],
-            'created_at': datetime.utcnow().isoformat()
+            'user_id': user_id,
+            'comment': data['comment'].strip(),
+            # --- REMOVED: Let database handle id and created_at ---
         }
+        
+        # --- CHANGE: Use user's token to enforce RLS for comment insertion ---
+        original_auth = supabase.postgrest.auth
+        try:
+            supabase.postgrest.auth(token)
+            result = supabase.table('issue_comments').insert(comment_data).execute()
+        finally:
+            supabase.postgrest.auth(original_auth)
 
-        # Insert comment
-        result = supabase.table('issue_comments').insert(comment_data).execute()
+        if not result.data:
+            raise Exception("Failed to add comment. Check RLS policies.")
 
         return jsonify({
             'message': 'Comment added successfully',
@@ -226,14 +220,24 @@ def add_comment(issue_id):
         }), 201
 
     except Exception as e:
+        print(f"ERROR in add_comment: {e}")
         return jsonify({'message': 'Failed to add comment', 'error': str(e)}), 500
 
-@issues_bp.route('/issues/<issue_id>/comments', methods=['GET'])
+
+@issues_bp.route('/<int:issue_id>/comments', methods=['GET'])
 @token_required
 def get_comments(issue_id):
     """Get all comments for an issue"""
     try:
-        result = supabase.table('issue_comments').select('*, profiles(full_name)').eq('issue_id', issue_id).order('created_at', desc=True).execute()
+        # It's good practice to enforce RLS here too.
+        token = request.headers.get('Authorization').split(" ")[1]
+        original_auth = supabase.postgrest.auth
+        try:
+            supabase.postgrest.auth(token)
+            # This ensures a user can only get comments for an issue they are allowed to see.
+            result = supabase.table('issue_comments').select('*, profiles(full_name)').eq('issue_id', issue_id).order('created_at', desc=True).execute()
+        finally:
+            supabase.postgrest.auth(original_auth)
 
         return jsonify({
             'comments': result.data,
@@ -241,4 +245,6 @@ def get_comments(issue_id):
         }), 200
 
     except Exception as e:
+        print(f"ERROR in get_comments: {e}")
         return jsonify({'message': 'Failed to get comments', 'error': str(e)}), 500
+

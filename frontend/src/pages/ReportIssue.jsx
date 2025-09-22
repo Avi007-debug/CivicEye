@@ -1,31 +1,38 @@
 import React, { useState } from 'react';
-import { supabase } from './supabase'; // Assuming supabase client is in src/lib
+// --- FIX: Add all required icon imports from lucide-react ---
 import { 
-  Camera, 
-  MapPin, 
-  Mic, 
-  Upload, 
-  Send, 
-  Globe, 
   Bot,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  Mic,
+  MapPin,
+  Upload,
+  Send
 } from 'lucide-react';
 
+// --- FIX: Import useAuth to get the real user session ---
+import { useAuth } from '../context/AuthContext'; 
+
 const ReportIssue = () => {
+  // --- FIX: Get the session from the AuthContext ---
+  const { session } = useAuth();
+  const token = session?.access_token;
+
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionError, setSubmissionError] = useState(null);
+  const [newIssueId, setNewIssueId] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     category: '',
     priority: '',
-    location: '',
+    location_text: '',
     images: [],
-    isAnonymous: false,
+    is_anonymous: false,
     language: 'english'
   });
+  
   const [isRecording, setIsRecording] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState(null);
 
@@ -53,7 +60,6 @@ const ReportIssue = () => {
       [field]: value
     }));
 
-    // Simulate AI suggestion after title input
     if (field === 'title' && value.length > 10) {
       setTimeout(() => {
         setAiSuggestion({
@@ -64,8 +70,8 @@ const ReportIssue = () => {
       }, 1000);
     }
   };
-
-  const handleImageUpload = (event) => {
+  
+    const handleImageUpload = (event) => {
     const files = Array.from(event.target.files);
     setFormData(prev => ({
       ...prev,
@@ -80,7 +86,7 @@ const ReportIssue = () => {
           const { latitude, longitude } = position.coords;
           setFormData(prev => ({
             ...prev,
-            location: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+            location_text: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
           }));
         },
         (error) => {
@@ -89,11 +95,10 @@ const ReportIssue = () => {
       );
     }
   };
-
-  const toggleRecording = () => {
+  
+    const toggleRecording = () => {
     setIsRecording(!isRecording);
     if (!isRecording) {
-      // Simulate voice recording
       setTimeout(() => {
         setIsRecording(false);
         setFormData(prev => ({
@@ -106,9 +111,14 @@ const ReportIssue = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.title || !formData.description || !formData.category || !formData.location) {
+    if (!formData.title || !formData.description || !formData.category || !formData.location_text) {
       setSubmissionError("Please fill all required fields: Title, Description, Category, and Location.");
       return;
+    }
+
+    if (!token) {
+        setSubmissionError("You must be logged in to report an issue.");
+        return;
     }
 
     setCurrentStep(4);
@@ -116,56 +126,43 @@ const ReportIssue = () => {
     setSubmissionError(null);
 
     try {
-      // 1. Upload images to Supabase Storage
-      const imageUrls = [];
-      if (formData.images.length > 0) {
-        const uploadResults = await Promise.all(
-          formData.images.map(async (image) => {
-            const filePath = `user-uploads/${Date.now()}_${image.name.replace(/\s/g, '_')}`;
-            const { data, error } = await supabase.storage
-              .from('issue-images') // Bucket must be created in Supabase with public access
-              .upload(filePath, image, { cacheControl: '3600', upsert: false });
-            if (error) throw error;
-
-            const { data: publicData } = supabase.storage
-              .from('issue-images')
-              .getPublicUrl(filePath);
-
-            return publicData.publicUrl; // Return the public URL
-          })
-        );
-
-        imageUrls.push(...uploadResults);
-      }
-
-      // 2. Prepare data for Supabase table insert
       const reportData = {
         title: formData.title,
         description: formData.description,
         category: formData.category,
         priority: formData.priority || 'medium',
-        location_text: formData.location, // Assuming a text field for location
-        image_url: imageUrls,
-        is_anonymous: formData.isAnonymous,
+        location_text: formData.location_text,
+        is_anonymous: formData.is_anonymous,
         language: formData.language,
-        status: 'new',
       };
 
-      // 3. Insert data into 'issues' table
-      const { error: insertError } = await supabase.from('issues').insert([reportData]);
-      if (insertError) throw insertError;
+      const response = await fetch('http://localhost:5000/api/issues/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(reportData)
+      });
+      
+      const result = await response.json();
 
+      if (!response.ok) {
+        throw new Error(result.message || 'An unknown error occurred.');
+      }
+      
+      setNewIssueId(result.issue.id);
       setCurrentStep(5);
     } catch (error) {
       console.error('Submission error:', error);
       setSubmissionError(error.message);
-      setCurrentStep(2); // Go back to the form on error
+      setCurrentStep(2); 
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  const renderStepIndicator = () => (
+  
+    const renderStepIndicator = () => (
     <div className="flex items-center justify-center mb-8">
       {[1, 2, 3, 4, 5].map((step) => (
         <div key={step} className="flex items-center">
@@ -212,8 +209,8 @@ const ReportIssue = () => {
       </div>
     </div>
   );
-
-  const renderIssueForm = () => (
+  
+    const renderIssueForm = () => (
     <div className="max-w-4xl mx-auto">
       <h2 className="text-2xl font-bold text-center text-gray-900 mb-8">
         Report Your Issue
@@ -229,7 +226,6 @@ const ReportIssue = () => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Issue Title */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Issue Title *
@@ -244,7 +240,6 @@ const ReportIssue = () => {
           />
         </div>
 
-        {/* AI Suggestion */}
         {aiSuggestion && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-start">
@@ -266,7 +261,6 @@ const ReportIssue = () => {
           </div>
         )}
 
-        {/* Category Selection */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Category *
@@ -290,7 +284,6 @@ const ReportIssue = () => {
           </div>
         </div>
 
-        {/* Description */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Description *
@@ -323,7 +316,6 @@ const ReportIssue = () => {
           )}
         </div>
 
-        {/* Location */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Location *
@@ -331,8 +323,8 @@ const ReportIssue = () => {
           <div className="flex space-x-2">
             <input
               type="text"
-              value={formData.location}
-              onChange={(e) => handleInputChange('location', e.target.value)}
+              value={formData.location_text}
+              onChange={(e) => handleInputChange('location_text', e.target.value)}
               placeholder="Enter location or use GPS"
               className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
@@ -347,7 +339,6 @@ const ReportIssue = () => {
           </div>
         </div>
 
-        {/* Priority */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Priority Level
@@ -375,7 +366,6 @@ const ReportIssue = () => {
           </div>
         </div>
 
-        {/* Image Upload */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Upload Images (Optional)
@@ -406,13 +396,12 @@ const ReportIssue = () => {
           )}
         </div>
 
-        {/* Anonymous Option */}
         <div className="flex items-center">
           <input
             type="checkbox"
             id="anonymous"
-            checked={formData.isAnonymous}
-            onChange={(e) => handleInputChange('isAnonymous', e.target.checked)}
+            checked={formData.is_anonymous}
+            onChange={(e) => handleInputChange('is_anonymous', e.target.checked)}
             className="mr-3"
           />
           <label htmlFor="anonymous" className="text-sm text-gray-700">
@@ -420,7 +409,6 @@ const ReportIssue = () => {
           </label>
         </div>
 
-        {/* Submit Button */}
         <div className="flex justify-between pt-6">
           <button
             type="button"
@@ -441,8 +429,8 @@ const ReportIssue = () => {
       </form>
     </div>
   );
-
-  const renderProcessing = () => (
+  
+    const renderProcessing = () => (
     <div className="max-w-md mx-auto text-center">
       <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-6"></div>
       <h2 className="text-2xl font-bold text-gray-900 mb-4">Processing Your Report</h2>
@@ -459,7 +447,7 @@ const ReportIssue = () => {
       </div>
       <h2 className="text-2xl font-bold text-gray-900 mb-4">Report Submitted Successfully!</h2>
       <p className="text-gray-600 mb-6">
-        Your issue has been assigned ID: <span className="font-semibold text-blue-600">#CC2024001</span>
+        Your issue has been assigned ID: <span className="font-semibold text-blue-600">#{newIssueId}</span>
       </p>
       <div className="bg-gray-50 rounded-lg p-4 mb-6">
         <h3 className="font-semibold text-gray-900 mb-2">Next Steps:</h3>
@@ -478,9 +466,9 @@ const ReportIssue = () => {
               description: '',
               category: '',
               priority: '',
-              location: '',
+              location_text: '',
               images: [],
-              isAnonymous: false,
+              is_anonymous: false,
               language: 'english'
             });
           }}
@@ -497,7 +485,7 @@ const ReportIssue = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg-px-8">
         {renderStepIndicator()}
         
         <div className="bg-white rounded-lg shadow-lg p-8">
@@ -507,7 +495,6 @@ const ReportIssue = () => {
           {currentStep === 5 && renderSuccess()}
         </div>
 
-        {/* Chatbot Integration Info */}
         <div className="mt-8 bg-gradient-to-r from-green-600 to-blue-600 rounded-lg shadow-lg p-6 text-white">
           <h3 className="text-xl font-semibold mb-4">Alternative Reporting Methods</h3>
           <div className="grid md:grid-cols-2 gap-6">
@@ -537,3 +524,4 @@ const ReportIssue = () => {
 };
 
 export default ReportIssue;
+
