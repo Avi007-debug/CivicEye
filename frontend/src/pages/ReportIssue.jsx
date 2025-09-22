@@ -385,7 +385,7 @@ const ReportIssue = () => {
                 Click to upload images or drag and drop
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                PNG, JPG, GIF up to 10MB each
+                PNG, JPG, GIF up to 2MB each
               </p>
             </label>
           </div>
