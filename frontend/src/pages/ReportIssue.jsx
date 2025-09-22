@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { supabase } from './supabase'; // Assuming supabase client is in src/lib
 import { 
   Camera, 
   MapPin, 
@@ -13,6 +14,8 @@ import {
 
 const ReportIssue = () => {
   const [currentStep, setCurrentStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -101,13 +104,65 @@ const ReportIssue = () => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.title || !formData.description || !formData.category || !formData.location) {
+      setSubmissionError("Please fill all required fields: Title, Description, Category, and Location.");
+      return;
+    }
+
     setCurrentStep(4);
-    // Simulate form submission
-    setTimeout(() => {
+    setIsSubmitting(true);
+    setSubmissionError(null);
+
+    try {
+      // 1. Upload images to Supabase Storage
+      const imageUrls = [];
+      if (formData.images.length > 0) {
+        const uploadResults = await Promise.all(
+          formData.images.map(async (image) => {
+            const filePath = `user-uploads/${Date.now()}_${image.name.replace(/\s/g, '_')}`;
+            const { data, error } = await supabase.storage
+              .from('issue-images') // Bucket must be created in Supabase with public access
+              .upload(filePath, image, { cacheControl: '3600', upsert: false });
+            if (error) throw error;
+
+            const { data: publicData } = supabase.storage
+              .from('issue-images')
+              .getPublicUrl(filePath);
+
+            return publicData.publicUrl; // Return the public URL
+          })
+        );
+
+        imageUrls.push(...uploadResults);
+      }
+
+      // 2. Prepare data for Supabase table insert
+      const reportData = {
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        priority: formData.priority || 'medium',
+        location_text: formData.location, // Assuming a text field for location
+        image_url: imageUrls,
+        is_anonymous: formData.isAnonymous,
+        language: formData.language,
+        status: 'new',
+      };
+
+      // 3. Insert data into 'issues' table
+      const { error: insertError } = await supabase.from('issues').insert([reportData]);
+      if (insertError) throw insertError;
+
       setCurrentStep(5);
-    }, 2000);
+    } catch (error) {
+      console.error('Submission error:', error);
+      setSubmissionError(error.message);
+      setCurrentStep(2); // Go back to the form on error
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const renderStepIndicator = () => (
@@ -164,6 +219,15 @@ const ReportIssue = () => {
         Report Your Issue
       </h2>
       
+      {submissionError && (
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6" role="alert">
+          <div className="flex">
+            <AlertTriangle className="h-5 w-5 text-red-500 mr-3" />
+            <p><span className="font-bold">Submission Failed:</span> {submissionError}</p>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Issue Title */}
         <div>
@@ -367,9 +431,10 @@ const ReportIssue = () => {
           </button>
           <button
             type="submit"
-            className="px-8 py-3 bg-gradient-to-r from-blue-600 to-teal-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-teal-700 transition-all duration-200 transform hover:scale-105 flex items-center"
+            disabled={isSubmitting}
+            className="px-8 py-3 bg-gradient-to-r from-blue-600 to-teal-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-teal-700 transition-all duration-200 transform hover:scale-105 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Submit Report
+            {isSubmitting ? 'Submitting...' : 'Submit Report'}
             <Send className="ml-2 h-4 w-4" />
           </button>
         </div>

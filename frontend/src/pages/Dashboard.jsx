@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom';
 import { 
   MapPin, 
   Clock, 
-  TrendingUp, 
   Award, 
   AlertTriangle, 
   CheckCircle,
@@ -16,8 +15,8 @@ import {
 
 const Dashboard = () => {
   const { user, session } = useAuth();
-  // --- FIX: Get token directly from the session object for consistency ---
   const token = session?.access_token;
+
   const [issues, setIssues] = useState([]);
   const [stats, setStats] = useState([]);
   const [filter, setFilter] = useState('all');
@@ -26,7 +25,6 @@ const Dashboard = () => {
 
   useEffect(() => {
     const fetchDashboardData = async () => {
-      // Ensure we don't fetch if the token is missing
       if (!token) {
         setLoading(false);
         setError("You must be logged in to view the dashboard.");
@@ -52,12 +50,10 @@ const Dashboard = () => {
           { label: "Total Reports", value: data.statistics.total_issues, icon: <AlertTriangle className="h-6 w-6" />, color: "bg-blue-500" },
           { label: "Resolved", value: data.statistics.resolved_issues, icon: <CheckCircle className="h-6 w-6" />, color: "bg-green-500" },
           { label: "In Progress", value: data.statistics.in_progress_issues, icon: <Clock className="h-6 w-6" />, color: "bg-orange-500" },
-          // Assuming civic points are stored on the user object from AuthContext
           { label: "Civic Points", value: user?.civic_points || 0, icon: <Award className="h-6 w-6" />, color: "bg-purple-500" }
         ];
         setStats(newStats);
 
-        // Use recent issues from backend
         setIssues(data.recent_issues);
       } catch (err) {
         setError(err.message);
@@ -113,6 +109,7 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Welcome back, {user?.name}!</h1>
@@ -181,7 +178,7 @@ const Dashboard = () => {
                     <div className="flex items-center space-x-3 mb-2">
                       <h3 className="text-lg font-medium text-gray-900">{issue.title}</h3>
                       <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(issue.status)}`}>
-                        {issue.status.replace('-', ' ')}
+                        {issue.status?.replace('-', ' ')}
                       </span>
                       <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(issue.priority)}`}>
                         {issue.priority}
@@ -190,17 +187,25 @@ const Dashboard = () => {
                     <div className="flex items-center text-sm text-gray-500 space-x-4 mb-2">
                       <div className="flex items-center">
                         <MapPin className="h-4 w-4 mr-1" />
-                        {issue.location_address || 'No location specified'}
+                        {issue.location_text || 'No location specified'}
                       </div>
                       <div className="flex items-center">
                         <Calendar className="h-4 w-4 mr-1" />
-                        {/* --- FIX: Use 'created_at' from backend instead of 'date' --- */}
                         {new Date(issue.created_at).toLocaleDateString()}
                       </div>
                       <div className="flex items-center">
                         <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">{issue.category}</span>
                       </div>
                     </div>
+
+                    {/* Show first image if available */}
+                    {issue.image_url?.length > 0 && (
+                      <img
+                        src={issue.image_url[0]}
+                        alt="Issue"
+                        className="w-32 h-32 object-cover rounded-lg mt-2"
+                      />
+                    )}
                   </div>
                   <div className="flex items-center space-x-6 mt-4 lg:mt-0">
                     <div className="flex items-center text-sm text-gray-500">

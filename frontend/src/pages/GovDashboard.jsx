@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell
+} from 'recharts';
 import {
   AlertTriangle,
   CheckCircle,
   Clock,
   TrendingUp,
-  Filter,
   Download,
   Users,
   MapPin
@@ -17,12 +19,9 @@ const GovDashboard = () => {
   const { user, session } = useAuth();
   const token = session?.access_token;
 
-  // State to hold data from the API
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  // State for UI controls
   const [selectedTimeframe, setSelectedTimeframe] = useState('week');
 
   useEffect(() => {
@@ -37,9 +36,7 @@ const GovDashboard = () => {
       setError(null);
       try {
         const response = await fetch('http://localhost:5000/api/dashboard/government', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+          headers: { 'Authorization': `Bearer ${token}` }
         });
 
         if (!response.ok) {
@@ -59,7 +56,6 @@ const GovDashboard = () => {
     fetchGovDashboardData();
   }, [token]);
 
-  // --- Helper Functions for UI ---
   const getStatusColor = (status) => {
     const colors = {
       reported: 'bg-blue-100 text-blue-800',
@@ -73,13 +69,13 @@ const GovDashboard = () => {
 
   const getPriorityColor = (priority) => {
     const colors = {
-        high: 'bg-red-100 text-red-800',
-        medium: 'bg-yellow-100 text-yellow-800',
-        low: 'bg-green-100 text-green-800',
+      high: 'bg-red-100 text-red-800',
+      medium: 'bg-yellow-100 text-yellow-800',
+      low: 'bg-green-100 text-green-800',
     };
     return colors[priority] || 'bg-gray-100 text-gray-800';
   };
-  
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center"><p>Loading Government Dashboard...</p></div>;
   }
@@ -88,8 +84,8 @@ const GovDashboard = () => {
     return (
       <div className="min-h-screen flex items-center justify-center text-center">
         <div>
-            <p className="text-red-600 text-lg mb-4">Error: {error}</p>
-            <Link to="/login" className="text-blue-600 hover:underline">Return to Login</Link>
+          <p className="text-red-600 text-lg mb-4">Error: {error}</p>
+          <Link to="/login" className="text-blue-600 hover:underline">Return to Login</Link>
         </div>
       </div>
     );
@@ -99,23 +95,22 @@ const GovDashboard = () => {
     return <div className="min-h-screen flex items-center justify-center"><p>No data available.</p></div>;
   }
 
-  const { statistics, recent_issues, category_breakdown, status_breakdown } = dashboardData;
+  const { statistics = {}, recent_issues = [], category_breakdown = {}, status_breakdown = {} } = dashboardData;
 
-  // --- Data for Charts ---
+  // Ensure charts always have data arrays
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'];
 
-  const categoryData = Object.entries(category_breakdown || {}).map(([name, value], index) => ({
+  const categoryData = Object.entries(category_breakdown).map(([name, value], index) => ({
     name,
     value,
     fill: COLORS[index % COLORS.length]
   }));
 
-  const statusData = Object.entries(status_breakdown || {}).map(([name, value]) => ({
+  const statusData = Object.entries(status_breakdown).map(([name, value]) => ({
     name: name.charAt(0).toUpperCase() + name.slice(1).replace('_', ' '),
     issues: value
   }));
 
-  // Mock data for components not yet powered by the API
   const departmentData = [
     { name: "Public Works", issues: 856, resolved: 724, avg_time: "4.2 days" },
     { name: "Transportation", issues: 634, resolved: 587, avg_time: "3.8 days" },
@@ -125,78 +120,87 @@ const GovDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Government Dashboard</h1>
-              <p className="text-gray-600 mt-2">Monitor and manage civic issues across all departments</p>
-            </div>
-            <div className="flex items-center space-x-4 mt-4 lg:mt-0">
-              <select
-                value={selectedTimeframe}
-                onChange={(e) => setSelectedTimeframe(e.target.value)}
-                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="week">This Week</option>
-                <option value="month">This Month</option>
-                <option value="year">This Year</option>
-              </select>
-              <button className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors duration-200 flex items-center">
-                <Download className="h-4 w-4 mr-2" />
-                Export Report
-              </button>
-            </div>
+        <div className="mb-8 flex flex-col lg:flex-row justify-between items-start lg:items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Government Dashboard</h1>
+            <p className="text-gray-600 mt-2">Monitor and manage civic issues across all departments</p>
+          </div>
+          <div className="flex items-center space-x-4 mt-4 lg:mt-0">
+            <select
+              value={selectedTimeframe}
+              onChange={(e) => setSelectedTimeframe(e.target.value)}
+              className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
+              <option value="year">This Year</option>
+            </select>
+            <button className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors duration-200 flex items-center">
+              <Download className="h-4 w-4 mr-2" />
+              Export Report
+            </button>
           </div>
         </div>
 
-        {/* Stats Cards - Now using API data */}
+        {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <StatCard icon={<AlertTriangle/>} title="Total Issues" value={statistics.total_issues} />
-            <StatCard icon={<CheckCircle/>} title="Resolved Issues" value={statistics.resolved_issues} />
-            <StatCard icon={<Clock/>} title="In Progress" value={statistics.in_progress_issues} />
-            <StatCard icon={<TrendingUp/>} title="Urgent Issues" value={statistics.urgent_issues} />
+          <StatCard icon={<AlertTriangle />} title="Total Issues" value={statistics.total_issues || 0} />
+          <StatCard icon={<CheckCircle />} title="Resolved Issues" value={statistics.resolved_issues || 0} />
+          <StatCard icon={<Clock />} title="In Progress" value={statistics.in_progress_issues || 0} />
+          <StatCard icon={<TrendingUp />} title="Urgent Issues" value={statistics.urgent_issues || 0} />
         </div>
 
-        {/* Charts Section - Restored and using API data */}
+        {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-            <div className="lg:col-span-2 bg-white rounded-lg shadow-md p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Issue Status Breakdown</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={statusData}>
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <Tooltip />
-                        <Legend />
-                        <Bar dataKey="issues" fill="#3B82F6" />
-                    </BarChart>
-                </ResponsiveContainer>
-            </div>
-            <div className="bg-white rounded-lg shadow-md p-6">
-                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Issues by Category</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                        <Pie data={categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label >
-                             {categoryData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
-                        </Pie>
-                        <Tooltip />
-                    </PieChart>
-                </ResponsiveContainer>
-            </div>
+          <div className="lg:col-span-2 bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Issue Status Breakdown</h3>
+            {statusData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={statusData}>
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="issues" fill="#3B82F6" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-gray-500 text-sm">No status data available.</p>
+            )}
+          </div>
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Issues by Category</h3>
+            {categoryData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie data={categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+                    {categoryData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-gray-500 text-sm">No category data available.</p>
+            )}
+          </div>
         </div>
 
-        {/* Department Performance - Preserved as per your request */}
+        {/* Department Performance */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">Department Performance</h2>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Issues</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Resolved</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Success Rate</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg. Resolution Time</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Issues</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Resolved</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Success Rate</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg. Resolution Time</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -204,10 +208,10 @@ const GovDashboard = () => {
                   const successRate = Math.round((dept.resolved / dept.issues) * 100);
                   return (
                     <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dept.name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{dept.issues}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{dept.resolved}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{dept.name}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900">{dept.issues}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900">{dept.resolved}</td>
+                      <td className="px-6 py-4">
                         <div className="flex items-center">
                           <div className="flex-1 bg-gray-200 rounded-full h-2 mr-2">
                             <div className="bg-green-500 h-2 rounded-full" style={{ width: `${successRate}%` }}></div>
@@ -215,7 +219,7 @@ const GovDashboard = () => {
                           <span className="text-sm font-medium text-gray-900">{successRate}%</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{dept.avg_time}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900">{dept.avg_time}</td>
                     </tr>
                   );
                 })}
@@ -223,37 +227,41 @@ const GovDashboard = () => {
             </table>
           </div>
         </div>
-        
+
+        {/* High Priority Issues */}
         <div className="grid lg:grid-cols-2 gap-8 mb-8">
-          {/* Recent High Priority Issues - Now using API data */}
           <div className="bg-white rounded-lg shadow-md">
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-900">High Priority Issues</h2>
             </div>
             <div className="divide-y divide-gray-200">
-              {(recent_issues || []).filter(issue => issue.priority === 'high').map((issue) => (
-                <div key={issue.id} className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="text-sm font-medium text-gray-900 mb-2">{issue.title}</h3>
-                      <div className="flex items-center space-x-2 mb-2">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(issue.priority)}`}>{issue.priority}</span>
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(issue.status)}`}>{issue.status}</span>
+              {recent_issues.filter(issue => issue.priority === 'high').length > 0 ? (
+                recent_issues.filter(issue => issue.priority === 'high').map((issue) => (
+                  <div key={issue.id} className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h3 className="text-sm font-medium text-gray-900 mb-2">{issue.title}</h3>
+                        <div className="flex items-center space-x-2 mb-2">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(issue.priority)}`}>{issue.priority}</span>
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(issue.status)}`}>{issue.status}</span>
+                        </div>
+                        <div className="text-xs text-gray-500 space-y-1">
+                          <div className="flex items-center"><MapPin className="h-3 w-3 mr-1" />{issue.location_text || 'N/A'}</div>
+                          <div className="flex items-center"><Clock className="h-3 w-3 mr-1" />{new Date(issue.created_at).toLocaleDateString()}</div>
+                          <div className="flex items-center"><Users className="h-3 w-3 mr-1" />{issue.profiles?.full_name || 'N/A'}</div>
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-500 space-y-1">
-                        <div className="flex items-center"><MapPin className="h-3 w-3 mr-1" />{issue.location_address || 'N/A'}</div>
-                        <div className="flex items-center"><Clock className="h-3 w-3 mr-1" />{new Date(issue.created_at).toLocaleDateString()}</div>
-                        <div className="flex items-center"><Users className="h-3 w-3 mr-1" />{issue.profiles?.full_name || 'N/A'}</div>
-                      </div>
+                      <button className="text-blue-600 hover:text-blue-800 text-xs font-medium">Assign</button>
                     </div>
-                    <button className="text-blue-600 hover:text-blue-800 text-xs font-medium">Assign</button>
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="p-6 text-gray-500 text-sm">No high priority issues found.</p>
+              )}
             </div>
           </div>
 
-          {/* Resource Planning - Preserved as per your request */}
+          {/* Resource Planning */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-6">Resource Allocation</h2>
             <div className="space-y-4">
@@ -266,7 +274,10 @@ const GovDashboard = () => {
                       <span className="text-sm text-gray-500">{dept.issues - dept.resolved} pending</span>
                     </div>
                     <div className="flex-1 bg-gray-200 rounded-full h-2">
-                      <div className={`h-2 rounded-full ${workload > 80 ? 'bg-red-500' : workload > 50 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: `${workload}%` }}></div>
+                      <div
+                        className={`h-2 rounded-full ${workload > 80 ? 'bg-red-500' : workload > 50 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                        style={{ width: `${workload}%` }}
+                      ></div>
                     </div>
                   </div>
                 );
@@ -279,26 +290,22 @@ const GovDashboard = () => {
             </div>
           </div>
         </div>
+
       </div>
     </div>
   );
 };
 
-// Reusable StatCard component
-const StatCard = ({ icon, title, value }) => {
-    return (
-        <div className="bg-white rounded-lg shadow-md p-6 flex items-center space-x-4">
-            <div className={`p-3 rounded-full text-white bg-blue-500`}>
-                {React.cloneElement(icon, { className: "h-6 w-6" })}
-            </div>
-            <div>
-                <p className="text-sm font-medium text-gray-600">{title}</p>
-                <p className="text-2xl font-bold text-gray-900">{value}</p>
-            </div>
-        </div>
-    );
-};
-
+const StatCard = ({ icon, title, value }) => (
+  <div className="bg-white rounded-lg shadow-md p-6 flex items-center space-x-4">
+    <div className="p-3 rounded-full text-white bg-blue-500">
+      {React.cloneElement(icon, { className: "h-6 w-6" })}
+    </div>
+    <div>
+      <p className="text-sm font-medium text-gray-600">{title}</p>
+      <p className="text-2xl font-bold text-gray-900">{value}</p>
+    </div>
+  </div>
+);
 
 export default GovDashboard;
-

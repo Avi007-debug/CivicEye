@@ -71,9 +71,9 @@ def register():
                 'id': auth_response.user.id,
                 'email': email,
                 'full_name': full_name,
-                'user_type': user_type,
+                'role': user_type,
             }
-            supabase.table('profiles').insert(profile_data).execute()
+            supabase.table('users').insert(profile_data).execute()
 
             # --- FIX: Return session tokens for automatic login on the frontend ---
             return jsonify({
